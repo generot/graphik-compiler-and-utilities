@@ -1,0 +1,62 @@
+Specification made by: Martin Nakov
+Date: XX.XX.2020(4th quarter)
+
+--EXAMPLE--
+
+declare sum(a b) begin
+	retVal = a + b
+	ret retVal
+end
+
+declare main(none) begin
+	beta = 43
+	alpha = beta * (3 + alpha)
+
+	while alpha > 0 begin
+		plot alpha beta
+		alpha = alpha - 1
+	end
+
+	if alpha == 0 || beta > 34 && alpha != 10 begin
+		someRes = invoke sum(alpha beta)
+	end
+
+	ret 0
+end
+
+--EXAMPLE--
+
+--GRAMMAR--
+
+<program> ::= { <function_decl> }
+<function_decl> ::= "declare" <function> <block>
+<function> ::= <ident> "("<params>")"
+<block> ::= "begin" { <statement> } "end"
+<statement> ::= <loop> | <check> | <plot> | <ret> | <assign> | <break>
+<loop> ::= "while" <expr> <block>
+<check> ::= "if" <expr> <block>
+<plot> ::= "plot" <expr> <expr>
+<ret> ::= "ret" <expr>
+<assign> ::= <ident> "=" <expr>
+<expr> ::= <ident> | <num> | <logical_op> | <term> | <invoke>
+<invoke> ::= "invoke" <function>
+<logical_op> ::= <expr> <log_oper> <expr>
+<term> ::= <factor> "+" <factor> | <factor> "-" <factor>
+<factor> ::= <expr> "*" <expr> | <expr> "/" <expr>
+<params> ::= <ident> {" " <ident>} | "none"
+<ident> ::= [a-zA-Z]+ | <ident><num>
+<log_oper> ::= "||" | "&&" | "==" | "!=" | "<" | ">" | ">=" | "<="
+<break> ::= "break"
+<num> ::= [0-9]+
+
+--GRAMMAR--
+
+#NOTE: In the context of the BNF-represented grammar of the Graphik programming language,
+a function declaration(a.k.a. function_decl) is considered both the declaration and definition
+of the said function. Function declaration without definition is not permitted.
+
+Latest Graphik specification:
+	-Every value is a 64 bit signed integer(long long int).
+	-Consequently, every expression will be evaluated as such.
+	-Functions that take no parameters should be declared with the "none" keyword inside their parentheses
+	-The entry point of a standard Graphik program should be a function with the identifier "main".

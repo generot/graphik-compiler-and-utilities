@@ -1,0 +1,22 @@
+declare printLine(n c) begin
+	cnt = 0
+	while cnt < n begin
+		plot c 0
+		cnt = cnt + 1
+	end
+
+	ret 0
+end
+
+declare main(none) begin
+	integer = 2
+	cnt = 0
+	n = 10
+
+	while cnt < 20 begin
+		l = invoke printLine(integer n)
+		cnt = cnt + 1
+	end
+
+	ret 0
+end		

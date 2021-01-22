@@ -1,0 +1,27 @@
+_______________________________________
+declare main(none) begin
+	a = 4
+	if a == 4 begin
+		b = 5
+		a = a + b
+	end
+
+	f = invoke beta(a)
+	a = a + f
+end
+
+declare beta(inp) begin
+	ret inp * inp
+end
+_______________________________________
+
+Symbol table:
+-------------------------------------------
+symbol | scope 		| offset from base |
+-------|----------------|------------------|
+a      | main  		| 	0	   |
+b      | main_i		|	8	   |
+inp    | beta		|	16	   |
+main   | global		|	N/A        |
+beta   | global		|	N/A        |
+-------------------------------------------

@@ -1,0 +1,17 @@
+declare add(a b) begin
+	ret a + b
+end
+
+declare main(none) begin
+	cnt = 0
+	a = 20
+
+	while cnt < a begin
+		b = invoke add(cnt a)
+		plot cnt b
+
+		cnt = cnt + 1
+	end
+
+	ret 0
+end

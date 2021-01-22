@@ -1,0 +1,2274 @@
+#ifndef __AST_H__
+#define __AST_H__
+
+#define AST_AMOUNT_INIT 10
+#define REALLOC_AST 4
+
+#include "my_string.h"
+
+typedef long long int lint;
+
+struct tagStm;
+
+typedef enum {
+	COND_STM,
+	RET_STM,
+	BREAK_STM,
+	PLOT_STM,
+	ASSIGN_STM
+} stm_type;
+
+typedef enum {
+	ADD_OP,
+	SUB_OP,
+	MULT_OP,
+	DIV_OP,
+	NEG_OP,
+	OR_OP,
+	AND_OP,
+	LT_OP,
+	GT_OP,
+	LEQ_OP,
+	GEQ_OP,
+	EQ_OP,
+	NEQ_OP
+} oper;
+
+typedef struct exnode {
+	enum {OPERATION, VALUE_T, VARIABLE_T, FUNCCALL} expr_type;
+	enum {STATIC, DYNAMIC} resolution_type;
+
+	lint value;
+	String var_ident;
+
+	int operation;
+
+	struct exnode *lBranch, *rBranch, *func_args;
+	size_t arg_num;
+} expr_node;
+
+typedef struct {
+	String var_ident;
+	expr_node value;
+} assign_node, def_node;
+
+typedef struct {
+	expr_node value1, value2;
+} plot_node;
+
+typedef struct {
+	expr_node ret_val;
+} ret_node;
+
+typedef struct {
+	int s1, s2;
+	//...//
+} break_node;
+
+typedef struct tagBlock {
+	struct tagStm *stms;
+	size_t stm_num;
+} block_node;
+
+typedef struct {
+	enum {WHILE_T, IF_T} cond_type;
+	expr_node condition;
+	block_node scope;
+} cond_node;
+
+typedef struct tagStm {
+	stm_type	type;
+
+	cond_node	cond_stm;
+	break_node 	brk_stm;
+	assign_node 	asg;
+	plot_node	plot;
+	ret_node	ret;
+} statement_node;
+
+typedef struct {
+	String ident;
+	assign_node *args;
+	block_node scope;
+
+	size_t arg_num, stack_sz;
+} function_node;
+
+typedef struct {
+	function_node *funcs;
+	size_t sz;
+} program_node;
+
+#endif
+#ifndef __GEN_X64__
+#define __GEN_X64__
+
+#include "semantics.h"
+
+#define STACK_ALIGN 32
+
+#define STARTUP_PROC {								\
+	emit(out, "extern printf, exit");					\
+	emit(out, "section .data\nfmt db \"%%d %%d\", 10, 0");			\
+	emit(out, "section .text");						\
+}
+
+typedef enum {false, true} bool;
+
+bool is_value(expr_node*);
+expr_node *optimize_expr(expr_node*);
+
+void emit_and_or(FILE*, int, char*);
+
+lint trsl_static_expr(expr_node*);
+void trsl_dynamic_expr(FILE*, expr_node*, map);
+void trsl_assign(FILE*, assign_node*, map);
+void trsl_plot(FILE*, plot_node*, map);
+void trsl_cond(FILE*, cond_node*, map);
+void trsl_ret(FILE*, ret_node*, map);
+void trsl_statement(FILE*, statement_node*, map);
+void trsl_block(FILE*, block_node*, map);
+void trsl_function(FILE*, function_node*, map);
+void trsl_program(FILE*, program_node*, map);
+void trsl_break(FILE*);
+
+void generate_asm(FILE*, program_node*, analysis_res);
+
+#endif
+#ifndef __HASH_H__
+#define __HASH_H__
+
+#include "my_string.h"
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef enum {
+	FUNCTION,
+	VARIABLE,
+	ARGUMENT
+} type;
+
+typedef struct {
+	type symbol_type;
+
+	size_t num;
+	char *scope;
+
+	String ident;
+	size_t *arg_offsets, arg_num;
+} var, symbol;
+
+typedef struct tag_list {
+	var node;
+	struct tag_list *next;
+} list;
+
+typedef struct {
+	list **ptr;
+	size_t sz;
+} map;
+
+map make_map(size_t);
+
+void insert(map*, var);
+size_t hash(String, size_t);
+
+var take(map, String);
+var take_from_scope(map, String, char*);
+var find(list*, String);
+
+list *make_list(var);
+list *add_node(list*, var);
+
+void delete_map(map*);
+void delete_list(list*);
+#endif
+#ifndef __LEXER_H__
+#define __LEXER_H__
+
+#define NON -1
+
+#include <stdio.h>
+#include "my_string.h"
+
+typedef enum {
+	IDENT,
+	KEYWORD,
+	OPERATOR,
+	VALUE
+} token_type;
+
+typedef enum {
+	ADD = 1,
+	SUB,
+	MULT,
+	DIV,
+	POW,
+	LPAR,
+	RPAR
+} arthm_op;
+
+typedef enum {
+	OR = 1,
+	AND,
+	NEQ,
+	EQ,
+	LEQ,
+	GEQ,
+	GT,
+	LT,
+	ASG
+} logical_op;
+
+typedef enum {
+	IF = 1,
+	WHILE,
+	BEGIN,
+	END,
+	BREAK,
+	SET,
+	PLOT,
+	DECLARE,
+	INVOKE,
+	NONE,
+	RET
+} keyword;
+
+
+typedef struct {
+	token_type type;
+
+	logical_op lop;
+	arthm_op aop;
+
+	keyword kword;
+
+	String ident;
+	long long int value;
+} Token;
+
+typedef struct {
+	Token *ptr;
+	size_t len;
+} TokenArray;
+
+Token make_token(token_type, logical_op, 
+		arthm_op, keyword, String, double);
+
+TokenArray lex(FILE*);
+
+StringVector tokenize(FILE*);
+
+keyword check_keyword(String);
+arthm_op check_ar_oper(String);
+logical_op check_log_op(String, String);
+
+void print_tokens(Token*, size_t);
+
+#endif
+#ifndef __MY_STRING__
+#define __MY_STRING__
+
+#include <string.h>
+
+#define DEFAULT_SZ 30
+#define REALLOC_INTERVAL 6
+#define INVALID_STRING (String){NULL, 0, 0}
+
+#define IS_ALPHA(x) (((x) >= 'A' && (x) <= 'Z') || ((x) >= 'a' && (x) <= 'z'))
+
+#define IS_NUM(x) ((x) >= '0' && (x) <= '9')
+#define IS_ALNUM(x) (IS_ALPHA((x)) || IS_NUM((x)))
+#define IS_ALPHANUM(x) (((x) >= 'A' && (x) <= 'Z') || ((x) >= 'a' && (x) <= 'z') || ((x) >= '0' && (x) <= '9'))
+#define IS_WHITESPACE(x) ((x) != ' ' || (x) != '\n' || (x) != '\t')
+
+typedef unsigned long long int size_t;
+
+typedef enum {
+	ALPHA,
+	NUM,
+	ALPHANUM,
+	SPECIAL_ANSI
+} string_type;
+
+typedef struct {
+	char *ptr;
+	size_t len, max_size;
+} String;
+
+typedef struct {
+	String *ptr;
+	size_t size, ix;
+} StringVector;
+
+StringVector make_vector(size_t);
+
+//To pop a string and push another one
+//in its place, one should first save
+//the popped string in a temporary variable
+//and then delete it before pushing the new
+//string.
+String pop(StringVector*);
+void push_back(StringVector*, String);
+
+String make_string(const char*);
+String copy_string(String);
+String make_string_char(char);
+
+void delete_string(String*);
+void delete_vector(StringVector*);
+void string_push_back(String*, char);
+char string_pop(String*);
+char *substring(char*, char);
+
+int is_empty(String);
+int is_alpha(String);
+string_type string_dettype(String);
+
+#endif
+#ifndef __PARSE_UTIL__
+#define __PARSE_UTIL__
+
+#include <stdio.h>
+#include <stdlib.h>
+
+int emit(FILE *stream, const char *format, ...);
+void issue_error(const char *err_msg, ...);
+
+#endif
+#ifndef __PARSER_H__
+#define __PARSER_H__
+
+#include <stdlib.h>
+
+#include "lexer.h"
+#include "ast.h"
+#include "parse_util.h"
+
+#define MAX_STR 100
+
+//To be relocated to 'x64 assembly generation'
+
+//////////PARSER////////////
+program_node *parse_program(TokenArray);
+
+void program(program_node*);
+void function_decl(function_node*);
+void block(block_node*);
+void statement(statement_node*);
+
+//Statements
+void assign(assign_node*, stm_type*);
+void if_stm(cond_node*, stm_type*);
+void while_stm(cond_node*, stm_type*);
+void break_stm(stm_type*);
+void plot(plot_node*, stm_type*);
+void ret(ret_node*, stm_type*);
+
+//Expressions
+void invoke(expr_node*);
+void expr(expr_node*);
+void term(expr_node*);
+void factor(expr_node*);
+void negate(expr_node*);
+void value(expr_node*);
+//////////PARSER////////////
+
+#endif
+#ifndef __SANALYSIS_H__
+#define __SANALYSIS_H__
+
+#include "hash.h"
+#include "ast.h"
+#include "parse_util.h"
+
+#define SYMTABLE_SZ 40
+#define VAR_SIZE 8
+#define STFRAME_OFFSET (VAR_SIZE * 2)
+
+typedef struct {
+	map sym_table;
+	size_t final_stack_offset;
+} analysis_res;
+
+analysis_res perform_smc_analysis(program_node*);
+void parse_block(block_node*, map*);
+
+#endif
+#include "../include/gen_x64.h"
+
+String curr_scope;
+bool rax, rcx, rdx;
+
+int if_stack[20000], while_stack[20000];
+size_t if_ptr, wh_ptr, stack_size;
+
+char *logops[] = {
+	"setl", "setg", 
+	"setle", "setge",
+	"sete", "setne",
+};
+
+bool is_value(expr_node *ep) {
+	if(ep && ep->expr_type == VALUE_T) return true;
+	return false;
+}
+
+void push_stack(int a, bool is_if) { 
+	if(is_if) if_stack[if_ptr++] = a; 
+	else while_stack[wh_ptr++] = a;
+}
+
+int pop_stack(bool is_if) {
+	int to_ret = is_if ? if_stack[--if_ptr] : while_stack[--wh_ptr];
+
+	if(is_if) if_stack[if_ptr] = 0;
+	else while_stack[wh_ptr] = 0;
+
+	return to_ret;
+}
+
+expr_node *optimize_expr(expr_node *tree) {
+
+	if(!tree) return NULL;
+
+	if(tree->lBranch) tree->lBranch = optimize_expr(tree->lBranch);
+	if(tree->rBranch) tree->rBranch = optimize_expr(tree->rBranch);
+
+	switch(tree->expr_type) {
+	case OPERATION:
+		switch(tree->operation) {
+		case ADD_OP:
+			if(tree->rBranch && tree->rBranch->expr_type == VALUE_T && !tree->rBranch->value)
+				tree = tree->lBranch;
+			else if(tree->lBranch && tree->lBranch->expr_type == VALUE_T && !tree->lBranch->value) 
+				tree = tree->rBranch;
+
+			break;
+		case MULT_OP:
+			if(tree->rBranch && tree->rBranch->expr_type == VALUE_T && tree->rBranch->value == 1)
+				tree = tree->lBranch;
+			else if(tree->lBranch && tree->lBranch->expr_type == VALUE_T && tree->lBranch->value == 1)
+				tree = tree->rBranch;
+
+			break;
+		}
+		break;
+	}
+
+	return tree;
+}
+
+void emit_and_or(FILE *out, int oper, char *reg) {
+	static int label = 0;
+
+	switch(oper) {
+	case OR_OP:
+		emit(out, "cmp rax, 0");
+		emit(out, "jne or%d", label++);
+		emit(out, "cmp %s, 0", reg);
+		emit(out, "je or%d", label);
+		
+
+		emit(out, "or%d:", label - 1);
+		emit(out, "mov rax, 1");
+		emit(out, "jmp rest%d", label - 1);
+		emit(out, "or%d:", label);
+		emit(out, "mov rax, 0");
+		emit(out, "rest%d:", label - 1);
+		break;
+	case AND_OP:
+		emit(out, "cmp rax, 0");
+		emit(out, "je add%d", label);
+		emit(out, "cmp %s, 0", reg);
+		emit(out, "je add%d", label);
+		
+		emit(out, "mov rax, 1");
+		emit(out, "jmp rest%d", label);
+		emit(out, "add%d:", label);
+		emit(out, "mov rax, 0");
+		emit(out, "rest%d:", label);
+		break;
+	}
+}
+
+lint trsl_static_expr(expr_node *tree) {
+	if(!tree) return 0;
+
+	switch(tree->expr_type) {
+	case OPERATION:
+		switch(tree->operation) {
+		case ADD_OP: return trsl_static_expr(tree->lBranch) + trsl_static_expr(tree->rBranch);
+		case MULT_OP: return trsl_static_expr(tree->lBranch) * trsl_static_expr(tree->rBranch);
+		case DIV_OP: return trsl_static_expr(tree->lBranch) / trsl_static_expr(tree->rBranch);
+		case NEG_OP: return -trsl_static_expr(tree->lBranch);
+		case OR_OP: return trsl_static_expr(tree->lBranch) || trsl_static_expr(tree->rBranch);
+		case AND_OP: return trsl_static_expr(tree->lBranch) && trsl_static_expr(tree->rBranch);
+		case GEQ_OP: return trsl_static_expr(tree->lBranch) >= trsl_static_expr(tree->rBranch);
+		case LEQ_OP: return trsl_static_expr(tree->lBranch) <= trsl_static_expr(tree->rBranch);
+		case LT_OP: return trsl_static_expr(tree->lBranch) < trsl_static_expr(tree->rBranch);
+		case GT_OP: return trsl_static_expr(tree->lBranch) > trsl_static_expr(tree->rBranch);
+		case EQ_OP: return trsl_static_expr(tree->lBranch) == trsl_static_expr(tree->rBranch);
+		case NEQ_OP: return trsl_static_expr(tree->lBranch) != trsl_static_expr(tree->rBranch);
+		}
+		break;
+	case VALUE_T:
+		return tree->value;
+		break;
+	}
+}
+
+void trsl_dynamic_expr(FILE *out, expr_node *tree, map sym_table) {
+	if(!tree) return;
+
+	bool lbr = false, rbr = false;
+	var symb;
+
+	switch(tree->expr_type) {
+	case OPERATION:
+		switch(tree->operation) {
+		case ADD_OP:
+			lbr = is_value(tree->lBranch);
+			rbr = is_value(tree->rBranch);
+
+			if(lbr) trsl_dynamic_expr(out, tree->rBranch, sym_table);
+			else trsl_dynamic_expr(out, tree->lBranch, sym_table);
+
+			if(!lbr && !rbr && !rdx) {
+				emit(out, "mov rdx, rax");
+
+				rdx = true;
+				rax = rcx = false;
+			}
+
+
+			if(lbr) trsl_dynamic_expr(out, tree->lBranch, sym_table);
+			else trsl_dynamic_expr(out, tree->rBranch, sym_table);
+	
+			if(rdx && !lbr && !rbr) {
+				emit(out, "add rax, rdx");
+				rdx = false;
+			} else {
+				emit(out, "add rax, rcx");
+				rcx = false;
+			}
+
+			break;
+		case MULT_OP:
+			lbr = is_value(tree->lBranch);
+			rbr = is_value(tree->rBranch);
+
+			if(lbr) trsl_dynamic_expr(out, tree->rBranch, sym_table);
+			else trsl_dynamic_expr(out, tree->lBranch, sym_table);
+
+			if(!lbr && !rbr && !rdx) {
+				emit(out, "mov rdx, rax");
+
+				rdx = true;
+				rax = rcx = false;
+			}
+
+			if(lbr) trsl_dynamic_expr(out, tree->lBranch, sym_table);
+			else trsl_dynamic_expr(out, tree->rBranch, sym_table);
+
+			if(rdx && !lbr && !rbr) {
+				emit(out, "imul rdx");
+				rdx = false;
+			} else {
+				emit(out, "imul rcx");
+				rcx = false;
+			}
+
+			break;
+		case DIV_OP:
+			lbr = is_value(tree->lBranch);
+			rbr = is_value(tree->rBranch);
+
+			if(rbr) trsl_dynamic_expr(out, tree->lBranch, sym_table);
+			else trsl_dynamic_expr(out, tree->rBranch, sym_table);
+
+			if((!lbr || !rbr) && !rdx) {
+				emit(out, "mov rdx, rax");
+
+				rdx = true;
+				rax = rcx = false;
+			}
+
+			if(rbr) trsl_dynamic_expr(out, tree->rBranch, sym_table);
+			else trsl_dynamic_expr(out, tree->lBranch, sym_table);
+
+			if(rdx && (!lbr || !rbr)) {
+				emit(out, "idiv rdx");
+				rdx = false;
+			} else {
+				emit(out, "idiv rcx");
+				rcx = false;
+			}
+
+			break;
+		case NEG_OP:
+			lbr = is_value(tree->lBranch);
+			trsl_dynamic_expr(out, tree->lBranch, sym_table);
+			
+			if(rax && !rcx) emit(out, "neg rax");
+			else if(rax && rcx) emit(out, "neg rcx");
+			else if(!lbr) emit(out, "neg rdx");
+			
+			break;
+		case AND_OP:
+		case OR_OP:
+			lbr = is_value(tree->lBranch);
+			rbr = is_value(tree->rBranch);
+
+			if(lbr) trsl_dynamic_expr(out, tree->rBranch, sym_table);
+			else trsl_dynamic_expr(out, tree->lBranch, sym_table);
+
+			if(!lbr && !rbr && !rdx) {
+				emit(out, "mov rdx, rax");
+
+				rdx = true;
+				rax = rcx = false;
+			}
+
+
+			if(lbr) trsl_dynamic_expr(out, tree->lBranch, sym_table);
+			else trsl_dynamic_expr(out, tree->rBranch, sym_table);
+	
+			if(rdx && !lbr && !rbr) {
+				emit_and_or(out, tree->operation, "rdx");
+				rdx = false;
+			} else {
+				emit_and_or(out, tree->operation, "rcx");
+				rcx = false;
+			}
+			break;
+		case EQ_OP:
+		case NEQ_OP:
+		case GEQ_OP:
+		case LEQ_OP:
+		case GT_OP:
+		case LT_OP:
+			lbr = is_value(tree->lBranch);
+			rbr = is_value(tree->rBranch);
+
+			if(lbr) trsl_dynamic_expr(out, tree->rBranch, sym_table);
+			else trsl_dynamic_expr(out, tree->lBranch, sym_table);
+
+			if(!lbr && !rbr && !rdx) {
+				emit(out, "mov rdx, rax");
+
+				rdx = true;
+				rax = rcx = false;
+			}
+
+
+			if(lbr) trsl_dynamic_expr(out, tree->lBranch, sym_table);
+			else trsl_dynamic_expr(out, tree->rBranch, sym_table);
+	
+			if(rdx && !rcx && !lbr && !rbr) {
+				emit(out, "cmp rdx, rax");
+				emit(out, "%s al", logops[tree->operation - LT_OP]);
+				emit(out, "movzx rax, al");
+				rdx = false;
+			} else {
+				emit(out, "cmp rax, rcx");
+				emit(out, "%s al", logops[tree->operation - LT_OP]);
+				emit(out, "movzx rax, al");
+				rcx = false;
+			}
+
+			break;
+		}
+
+		break;
+	case VALUE_T:
+		if(!rax) {
+			emit(out, "mov rax, %lli", tree->value);
+			rax = true;
+		} else if(!rcx) {
+			emit(out, "mov rcx, %lli", tree->value);
+			rcx = true;
+		}
+		break;
+	case VARIABLE_T:
+		symb = take_from_scope(sym_table, tree->var_ident, curr_scope.ptr);
+		char ptr_oper = symb.symbol_type == ARGUMENT ? '+' : '-';
+
+		printf("%s - %zu\n", symb.ident.ptr, symb.num);
+
+		if(!rax) {
+			emit(out, "mov rax, [rbp %c %zu]", ptr_oper, symb.num);
+			rax = true;
+		} else if(!rcx) {
+			emit(out, "mov rcx, [rbp %c %zu]", ptr_oper, symb.num);
+			rcx = true;
+		}
+
+		break;
+	case FUNCCALL:
+		symb = take_from_scope(sym_table, tree->var_ident, "global");
+		
+		if(rax && !rcx) {
+			emit(out, "mov rcx, rax");
+			rcx = true;
+			rax = false;
+		}
+
+		for(int i = (int)tree->arg_num - 1; i >= 0; i--) {
+			if(tree->func_args[i].resolution_type == DYNAMIC) {
+				trsl_dynamic_expr(out, optimize_expr(&tree->func_args[i]), sym_table);
+
+				if(rax && !rcx) {
+					emit(out, "push rax");
+					rax = false;
+				}
+				else if(rax && rcx) {
+					emit(out, "push rcx");
+					rcx = false;
+				}
+
+			} else {
+				lint res = trsl_static_expr(optimize_expr(&tree->func_args[i]));
+				emit(out, "push %lli", res);
+			}
+		}
+
+		emit(out, "call %s", symb.ident.ptr);
+		rax = true;
+		break;
+	}
+
+}
+
+void trsl_assign(FILE *out, assign_node *asg, map sym_table) {
+	var symb = take_from_scope(sym_table, asg->var_ident, curr_scope.ptr);
+
+	if(asg->value.resolution_type == DYNAMIC) {
+		trsl_dynamic_expr(out, optimize_expr(&asg->value), sym_table);
+		emit(out, "mov [rbp - %zu], rax", symb.num);
+		rax = false;
+	} else {
+		lint res = trsl_static_expr(optimize_expr(&asg->value));
+		emit(out, "mov rax, %lli", res);
+		emit(out, "mov [rbp - %zu], rax", symb.num);
+		rax = false;
+	}
+		
+}
+
+void trsl_plot(FILE *out, plot_node *plt, map sym_table) {
+	if(plt->value1.resolution_type == DYNAMIC) {
+		trsl_dynamic_expr(out, optimize_expr(&plt->value1), sym_table);
+		emit(out, "mov rdx, rax");
+		rax = false;
+	} else {
+		lint res = trsl_static_expr(optimize_expr(&plt->value1));
+		emit(out, "mov rdx, %lli", res);
+	}
+
+	if(plt->value2.resolution_type == DYNAMIC) {
+		trsl_dynamic_expr(out, optimize_expr(&plt->value2), sym_table);
+		emit(out, "mov r8, rax");
+		rax = false;
+	} else {
+		lint res = trsl_static_expr(optimize_expr(&plt->value2));
+		emit(out, "mov r8, %lli", res);
+	}
+
+	emit(out, "lea rcx, [fmt]");
+	emit(out, "call printf");
+	rcx = false;
+}
+
+void trsl_ret(FILE *out, ret_node *rt, map sym_table) {
+	if(rt->ret_val.resolution_type == DYNAMIC) {
+		trsl_dynamic_expr(out, optimize_expr(&rt->ret_val), sym_table);
+	} else {
+		lint res = trsl_static_expr(optimize_expr(&rt->ret_val));
+		emit(out, "mov rax, %lli", res);
+	}
+
+
+	if(!strcmp(curr_scope.ptr, "main_")) {
+		//Exit routine//
+		emit(out, "add rsp, %lli", stack_size + STACK_ALIGN);
+		emit(out, "pop rbp");
+		emit(out, "push rax");
+		emit(out, "call exit");
+		//Exit routine//
+	} else {
+		char *func_sc = substring(curr_scope.ptr, '_');
+		String func_ident = make_string(func_sc);
+		string_pop(&func_ident);
+
+		var symb = take_from_scope(sym_table, func_ident, "global");
+
+		emit(out, "add rsp, %lli", stack_size * 2);
+		emit(out, "pop rbp");
+		emit(out, "ret %zu", symb.arg_num * VAR_SIZE);
+
+		delete_string(&func_ident);
+		free(func_sc);
+	}
+}
+
+void trsl_cond(FILE *out, cond_node *cnd, map sym_table) {
+	static int occs_i = 0, occs_w = 0;
+	int pos = 0;
+
+	switch(cnd->cond_type) {
+	case WHILE_T:
+		emit(out, "wl%d:", occs_w);
+
+		push_stack(occs_w, true);
+		occs_w++;
+
+		trsl_block(out, &cnd->scope, sym_table);
+		
+		if(cnd->condition.resolution_type == DYNAMIC) {
+			trsl_dynamic_expr(out, optimize_expr(&cnd->condition), sym_table);
+		} else {
+			lint res = trsl_static_expr(optimize_expr(&cnd->condition));
+			emit(out, "mov rax, %lli", res);
+		}
+
+		pos = pop_stack(true);
+
+		emit(out, "cmp rax, 1");
+		emit(out, "je wl%d", pos);
+		emit(out, "lw%d:", pos);
+
+		rax = false;
+		break;
+	case IF_T:
+		if(cnd->condition.resolution_type == DYNAMIC) {
+			trsl_dynamic_expr(out, optimize_expr(&cnd->condition), sym_table);
+		} else {
+			lint res = trsl_static_expr(optimize_expr(&cnd->condition));
+			emit(out, "mov rax, %lli", res);
+		}
+
+		emit(out, "cmp rax, 1");
+		emit(out, "jne li%d", occs_i);
+		rax = false;
+
+		push_stack(occs_i, false);
+		occs_i++;
+
+		trsl_block(out, &cnd->scope, sym_table);
+
+		emit(out, "li%d:", pop_stack(false));
+		break;
+	}
+}
+
+void trsl_break(FILE *out) {
+	emit(out, "jmp lw%d", while_stack[wh_ptr - 1]);
+}
+
+void trsl_statement(FILE *out, statement_node *stm, map sym_table) {
+	switch(stm->type) {
+	case COND_STM: trsl_cond(out, &stm->cond_stm, sym_table); break;
+	case RET_STM: trsl_ret(out, &stm->ret, sym_table); break;
+	case BREAK_STM: trsl_break(out); break;
+	case PLOT_STM: trsl_plot(out, &stm->plot, sym_table); break;
+	case ASSIGN_STM: trsl_assign(out, &stm->asg, sym_table); break;
+	}
+}
+
+void trsl_block(FILE *out, block_node *blc, map sym_table) {
+	for(size_t i = 0; i < blc->stm_num; i++)
+		trsl_statement(out, &blc->stms[i], sym_table);
+}
+
+void trsl_function(FILE *out, function_node *fn, map sym_table) {
+	curr_scope = make_string(fn->ident.ptr);
+	string_push_back(&curr_scope, '_');
+
+	bool is_main = !strcmp(curr_scope.ptr, "main_");
+
+	emit(out, "%s:", fn->ident.ptr);
+	emit(out, "push rbp");
+	emit(out, "mov rbp, rsp");
+	
+	stack_size = fn->stack_sz * 2;
+	emit(out, "sub rsp, %lli", is_main ? STACK_ALIGN + stack_size : stack_size * 2);
+
+	trsl_block(out, &fn->scope, sym_table);
+
+	delete_string(&curr_scope);
+}
+
+void trsl_program(FILE *out, program_node *prog, map sym_table) {
+	for(size_t i = 0; i < prog->sz; i++)
+		trsl_function(out, &prog->funcs[i], sym_table);
+}
+
+void generate_asm(FILE *out, program_node *ast, analysis_res res) {
+	fprintf(out, "global ");
+	for(size_t i = 0; i < ast->sz; i++) {
+		fprintf(out, "%s", ast->funcs[i].ident.ptr);
+		if(i != ast->sz - 1) fprintf(out, ", ");
+	}
+
+	fputc('\n', out);
+
+	stack_size = if_ptr = wh_ptr = 0;
+	rax = rcx = rdx = false;
+
+	STARTUP_PROC;
+	trsl_program(out, ast, res.sym_table);
+}
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "../include/lexer.h"
+#include "../include/parser.h"
+#include "../include/semantics.h"
+#include "../include/gen_x64.h"
+
+#define INTERNAL_ERROR(...) { 		\
+	fprintf(stderr, __VA_ARGS__);	\
+	exit(EXIT_FAILURE);		\
+}
+
+#define USG_ERROR "Incorrect output specification.\n"
+
+#define MAX_CMD 50
+
+#define COMPILE  0x02
+#define ASSEMBLE 0x04
+#define LINK	 0x08
+
+char *change_extension(char *dir, char *new_ex) {
+	char *no_ex = substring(dir, '.');
+	strcat(no_ex, new_ex);
+
+	return no_ex;
+}
+
+int compiler_entry(FILE *in, FILE *out, int flags, char *output_name, char *asm_ext) {
+	TokenArray tokens = lex(in);
+	program_node *ast = parse_program(tokens);
+	analysis_res semantic_results = perform_smc_analysis(ast);
+
+	char nasm_cmd[MAX_CMD] = {0}, ld_cmd[MAX_CMD] = {0},
+	     *object_out = change_extension(output_name, "o"),
+	     *exe_out = change_extension(output_name, "exe");
+
+	sprintf(nasm_cmd, "nasm -f win64 -o %s %s", object_out, asm_ext);
+	puts(nasm_cmd);
+
+	sprintf(ld_cmd, "ld -o %s %s -L. -lmsvcrt -e main", exe_out, object_out);
+	puts(ld_cmd);
+
+	if(flags & COMPILE) generate_asm(out, ast, semantic_results);
+	if(flags & ASSEMBLE) {
+		fclose(out);
+		system(nasm_cmd);
+	}
+	if(flags & LINK) {
+		system(ld_cmd);
+	}
+
+	return flags;
+}
+
+int main(int argc, char **argv) {
+	FILE *input = NULL, *output = NULL;
+	char *out_name = NULL, *out_name2 = NULL;
+
+	const char *options[] = {
+		"-help", "-o",
+		"-c", "-s", "-credits"
+	};
+
+	size_t opt_sz = sizeof(options) / sizeof(char*);
+	int flags = 0;
+
+	if(argc > 1) {
+		for(int j = 0; j < argc; j++) {
+			for(int i = 0; i < opt_sz; i++) {
+				if(!strcmp(argv[j], options[i])) {
+					switch(i) {
+					case 0:
+						printf( "Graphik Lightweight Compiler - version 0.1.0\n"
+						"-o -> Specify output characteristics(name, extension, etc.)\n"
+						"-s -> Compile to x64 Assembly\n"
+						"-c -> Compile and assemble(via NASM)\n"
+						"-credits -> Information about the developer/development of GLC"
+						"glc <source_file> -> Compile, assemble and link into an executable" );
+						return EXIT_SUCCESS;
+					case 1:
+						//Handle output
+						if(argv[j + 1] && argv[j + 2]) {
+							out_name = strdup(change_extension(argv[j + 1], "s"));
+							out_name2 = strdup(argv[j + 1]);
+
+							input = fopen(argv[j + 2], "r");
+							output = fopen(out_name, "w");
+
+							flags = COMPILE | ASSEMBLE | LINK;
+						} else INTERNAL_ERROR(USG_ERROR "Usage: glc -o <output> <src>");
+
+						break;
+					case 2:
+						//Handle object output
+						if(argv[j + 1]) {
+							out_name = strdup(change_extension(argv[j + 1], "s"));
+							out_name2 = strdup(argv[j + 1]);
+
+							input = fopen(argv[j + 1], "r");
+							output = fopen(out_name, "w");
+
+							flags = COMPILE | ASSEMBLE;
+						} else INTERNAL_ERROR(USG_ERROR "Usage: glc -c <src>");
+
+						break;
+					case 3: 
+						//Handle assembly output
+						if(argv[j + 1]) {
+							out_name = strdup(change_extension(argv[j + 1], "s"));
+							out_name2 = strdup(argv[j + 1]);
+
+							input = fopen(argv[j + 1], "r");
+							output = fopen(out_name, "w");
+
+							flags = COMPILE;
+						} else INTERNAL_ERROR(USG_ERROR "Usage: glc -s <src>");
+						break;
+					case 4:
+						printf("---------------------------------------------------------------------------------------------------------------\n"
+						"The Graphik Lightweight Compiler and all Graphik utilities,\n"
+						"coming with it, have been solely built by Martin Nakov('generot' in GitHub).\n"
+						"---------------------------------------------------------------------------------------------------------------\n"
+						"The graphical calculator and compiler have been written entirely from scratch,\n"
+						"and no third party libraries/dependencies have been used for their creation.\n"
+						"---------------------------------------------------------------------------------------------------------------\n"
+						"Only the Windows Native API has been utilized for the production of the graphical calculator's user interface.\n"
+						"---------------------------------------------------------------------------------------------------------------\n"
+						"The entire utility package serves as my 1st semester programming project, nevertheless, development will\n"
+						"most likely continue in the future, as long as I have the time and the nerve to work on it.\n"
+						"---------------------------------------------------------------------------------------------------------------\n");
+						return EXIT_SUCCESS;
+					}
+				}
+			}
+		}
+	} else INTERNAL_ERROR("No arguments provided.\nUse \"glc -help\" for details\n");
+
+	compiler_entry(input, output, flags, out_name2, out_name);
+
+	if(out_name) free(out_name);
+	if(out_name2) free(out_name2);
+
+	return 0;
+}
+#include "../include/hash.h"
+#define NON -1
+
+map make_map(size_t max_len) {
+	map new_map = {
+		calloc(max_len, sizeof(list*)),
+		max_len
+	};
+
+	var def_var = {NON, 0, NULL, INVALID_STRING};
+	for(size_t i = 0; i < max_len; i++) 
+		new_map.ptr[i] = make_list(def_var);
+
+	return new_map;
+}
+
+size_t hash(String ident, size_t map_size) {
+	size_t ix = 0;
+	for(size_t i = 0; i < ident.len; i++) {
+		ix += ident.ptr[i];
+		ix ^= ix << 2;
+	}
+
+	return ix % map_size;
+}
+
+void insert(map *mp, var v) {
+	size_t ix_to_map = hash(v.ident, mp->sz);
+	mp->ptr[ix_to_map] = add_node(mp->ptr[ix_to_map], v);
+}
+
+var take(map mp, String ident) {
+	size_t ix = hash(ident, mp.sz);
+	return find(mp.ptr[ix], ident);
+}
+
+var find(list *ls, String ident) {
+	for(list *i = ls; i; i = i->next) {
+		if(i->node.ident.ptr && !strcmp(i->node.ident.ptr, ident.ptr))
+			return i->node;
+	}
+
+	return (var){NON, 0, NULL, INVALID_STRING};
+}
+
+var take_from_scope(map mp, String ident, char *superscope) {
+	size_t ix = hash(ident, mp.sz);
+	for(list *ls = mp.ptr[ix]; ls; ls = ls->next) {
+		if(ls->node.ident.ptr) {
+			char *sscope = substring(ls->node.scope, '_');
+
+			if(!strcmp(ls->node.ident.ptr, ident.ptr)
+			&& !strcmp(sscope, superscope))
+				return ls->node;
+		}
+	}
+
+	return (var){NON, 0, NULL, INVALID_STRING};
+}
+
+list *make_list(var v) {
+	list *new_list = malloc(sizeof(list));
+
+	new_list->node = v;
+	new_list->next = NULL;
+
+	return new_list;
+}
+
+list *add_node(list *ls, var v) {
+	list *new_node = malloc(sizeof(list));
+
+	new_node->node = v;
+	new_node->next = ls;
+	ls = new_node;
+
+	return ls;
+}
+
+void delete_list(list *base) {
+	if(!base) return;
+
+	delete_list(base->next);
+	free(base);
+}
+
+void delete_map(map *mp) {
+	for(size_t i = 0; i < mp->sz; i++)
+		delete_list(mp->ptr[i]);
+}	
+#include "../include/lexer.h"
+#include <stdlib.h>
+
+Token make_token(token_type tp, logical_op lop, 
+		arthm_op aop, keyword kwd, String ident, double val)
+{
+	Token new_token = {
+		tp,
+		lop,
+		aop,
+		kwd,
+		ident,
+		val
+	};
+
+	return new_token;
+}
+
+StringVector tokenize(FILE *stream) {
+	StringVector vec = make_vector(10);
+
+	String token = make_string("");
+	char current_char, prev_char = 0;
+
+	while((current_char = getc(stream)) != EOF) {	
+		if(IS_ALPHANUM(current_char)) {
+			string_push_back(&token, current_char);
+		}
+		
+		if(!IS_ALPHANUM(current_char) && IS_ALPHANUM(prev_char)) {
+			push_back(&vec, token);
+			delete_string(&token);
+
+			token = make_string("");
+		}
+
+		if(!IS_ALPHANUM(current_char) && current_char != ' ' && current_char != '\n' && current_char != '\t')
+			push_back(&vec, make_string_char(current_char));
+
+		prev_char = current_char;
+	}
+
+	return vec;
+}
+
+keyword check_keyword(String tok) {
+	const char *keywords[] = {
+		"if", "while",
+		"begin", "end",
+		"break", "set",
+		"plot", "declare",
+		"invoke", "none",
+		"ret"
+	};
+
+	for(int i = 0; i < sizeof(keywords)/sizeof(char*); i++) {
+		if(!strcmp(tok.ptr, keywords[i]))
+			switch(i) {
+			case 0:  return IF;
+			case 1:  return WHILE;
+			case 2:  return BEGIN;
+			case 3:  return END;
+			case 4:  return BREAK;
+			case 5:  return SET;
+			case 6:  return PLOT;
+			case 7:  return DECLARE;
+			case 8:  return INVOKE;
+			case 9:  return NONE;
+			case 10: return RET;
+			}
+	}
+
+	return NON;
+}
+
+arthm_op check_ar_oper(String tok) {
+	const char *ops[] = {
+		"+", "-",
+		"*", "/",
+		"^", ")",
+		"("
+	};
+
+	for(int i = 0; i < sizeof(ops)/sizeof(char*); i++) {
+		if(!strcmp(tok.ptr, ops[i]))
+			switch(i) {
+			case 0: return ADD;
+			case 1: return SUB;
+			case 2: return MULT;
+			case 3: return DIV;
+			case 4: return POW;
+			case 5: return RPAR;
+			case 6: return LPAR;
+			}
+	}
+
+	return NON;
+}
+
+logical_op check_log_op(String tok, String next_tok) {
+	if(!strcmp(tok.ptr, "<")) {
+		if(!strcmp(next_tok.ptr, "="))
+			return LEQ;
+
+		return LT;
+	} else if(!strcmp(tok.ptr, ">")) {
+		if(!strcmp(next_tok.ptr, "="))
+			return GEQ;
+
+		return GT;
+	} 
+	else if(!strcmp(tok.ptr, "!") && !strcmp(next_tok.ptr, "="))  return NEQ;
+	else if(!strcmp(tok.ptr, "|") && !strcmp(next_tok.ptr, "|"))  return OR;
+	else if(!strcmp(tok.ptr, "&") && !strcmp(next_tok.ptr, "&"))  return AND;
+	else if(!strcmp(tok.ptr, "=") && !strcmp(next_tok.ptr, "="))  return EQ;
+	else if(!strcmp(tok.ptr, "=")) 	return ASG;
+
+	return NON;
+}
+
+TokenArray lex(FILE *stream) {
+	StringVector tokens = tokenize(stream);
+
+	Token *lexed_tokens = calloc(tokens.size, sizeof(Token));
+	size_t tok_ix = 0;
+	
+	//IMPORTANT!!!: Make a delete_token() method that, after usage, releases the memory,
+	//occupied by the identifier if it is a valid string.
+	for(size_t i = 0; i < tokens.ix; i++) {
+		string_type str_tp = string_dettype(tokens.ptr[i]);
+
+		keyword maybe_keyword = NON;
+		arthm_op maybe_ar_op = NON;
+		logical_op maybe_log_op = NON;
+
+		switch(str_tp) {
+		case ALPHA:
+			maybe_keyword = check_keyword(tokens.ptr[i]);
+
+			if(maybe_keyword != NON) { 
+				lexed_tokens[tok_ix++] = make_token(
+					KEYWORD, NON, 
+					NON, maybe_keyword, 
+					INVALID_STRING, 0
+				);
+
+				maybe_keyword = NON;
+			} else {
+				lexed_tokens[tok_ix++] = make_token(
+					IDENT, NON, 
+					NON, NON, 
+					copy_string(tokens.ptr[i]), 0
+				);
+			}
+
+			break;
+		case NUM:
+			lexed_tokens[tok_ix++] = make_token(
+				VALUE, NON, 
+				NON, NON, 
+				INVALID_STRING, atof(tokens.ptr[i].ptr)
+			);
+			break;
+
+		case ALPHANUM:
+			lexed_tokens[tok_ix++] = make_token(
+				IDENT, NON, 
+				NON, NON, 
+				copy_string(tokens.ptr[i]), 0
+			);
+			break;
+
+		case SPECIAL_ANSI:
+			maybe_ar_op = check_ar_oper(tokens.ptr[i]);
+			if(maybe_ar_op != NON) {
+				lexed_tokens[tok_ix++] = make_token(
+					OPERATOR, NON, 
+					maybe_ar_op, NON, 
+					INVALID_STRING, 0
+				);
+
+				maybe_ar_op = NON;
+			} else {
+				maybe_log_op = check_log_op(tokens.ptr[i], tokens.ptr[i + 1]);
+
+				if(maybe_log_op != NON) {
+					lexed_tokens[tok_ix++] = make_token(
+						OPERATOR, maybe_log_op, 
+						NON, NON, 
+						INVALID_STRING, 0
+					);
+
+					switch(maybe_log_op) {
+					case GEQ: case LEQ: case NEQ: case EQ: case OR: case AND: i++;
+					break;
+					}
+
+					maybe_log_op = NON;
+				}
+			}
+
+			//i++;
+			break;
+		} 
+	}
+	
+	lexed_tokens = realloc(lexed_tokens, tok_ix * sizeof(Token));
+	delete_vector(&tokens);
+
+	return (TokenArray){lexed_tokens, tok_ix};
+}
+
+void print_tokens(Token *arr, size_t len) {
+	for(size_t i = 0; i < len; i++) {
+		Token ctok = arr[i];
+		printf("Type: %d\nLog. op: %d\nAr. op: %d\nKeyword: %d\nIdentifier: %s\nValue: %lli\n\n", 
+				ctok.type, ctok.lop, ctok.aop, ctok.kword, ctok.ident.ptr ? 
+				ctok.ident.ptr : "NULL", ctok.value);
+	}
+}
+
+#include "../include/parse_util.h"
+#include <stdarg.h>
+
+int emit(FILE *stream, const char *format, ...) {
+	va_list arglist;
+	va_start(arglist, format);
+
+	int bytes = vfprintf(stream, format, arglist);
+	fputc('\n', stream);
+
+	va_end(arglist);
+	return bytes + 1;
+}
+
+void issue_error(const char *err_msg, ...) {
+	va_list arglist;
+	va_start(arglist, err_msg);
+
+	fprintf(stderr, "GLC: ");
+	vfprintf(stderr, err_msg, arglist);
+	va_end(arglist);
+
+	exit(-1);
+}
+#include "../include/parser.h"
+
+Token *tokens;
+size_t len, ix;
+
+/////////DEPRECATED///////////
+//Poburkah se zaradi taja funkcija
+/*int expect_symbol(int symbol) {
+	switch(tokens[ix].type) {
+	case IDENT: case VALUE: if(!symbol) return 1; break;
+	case KEYWORD:
+		if(tokens[ix].kword == symbol) return 1; break;
+	case OPERATOR:
+		if(tokens[ix].lop == symbol) return 1;
+		else if(tokens[ix].aop == symbol) return 1;
+		break;
+	}	
+	
+	return 0;
+}*/
+
+void program(program_node *prog) {
+	prog->funcs = malloc(AST_AMOUNT_INIT * sizeof(function_node));
+	size_t func_ix = 0, ptr_size = AST_AMOUNT_INIT;
+
+	//puts("In program...");
+	while(ix < len-1) {
+		if(func_ix >= ptr_size) {
+			ptr_size += REALLOC_AST;
+			prog->funcs = realloc(prog->funcs, ptr_size * sizeof(function_node));
+		}
+
+		function_decl(&prog->funcs[func_ix++]);
+	}
+
+	prog->sz = func_ix;
+}
+
+void function_decl(function_node *func) {
+	size_t args_ix = 0, ptr_size = AST_AMOUNT_INIT;
+	func->args = malloc(AST_AMOUNT_INIT * sizeof(assign_node));
+
+	//puts("In function declaration...");
+	if(ix < len && tokens[ix].kword == DECLARE) {
+		ix++;
+		
+		if(tokens[ix].type == IDENT) 
+			func->ident = copy_string(tokens[ix].ident);
+		else issue_error("expected function identifier.");
+
+		ix++;
+
+		if(tokens[ix].aop == LPAR) {
+			ix++;
+			while(tokens[ix].aop != RPAR) {
+				if(ix == len - 1)
+					issue_error("unmatched parentheses for function '%s'.", func->ident.ptr);
+
+				if(args_ix >= ptr_size) {
+					ptr_size += REALLOC_AST;
+					func->args = realloc(func->args, ptr_size * sizeof(def_node));
+				}
+
+				if(tokens[ix].kword != NONE) {
+					func->args[args_ix++].var_ident = copy_string(tokens[ix].ident);
+				}/* else {
+					free(func->args);
+					func->args = NULL;
+				}*/
+
+				ix++;
+			}
+			func->arg_num = args_ix;
+		} else issue_error("expected parentheses for function '%s'", func->ident.ptr);
+
+		func->stack_sz = 0;
+
+		ix++;
+		block(&func->scope);
+		ix++;
+		
+	} else issue_error("expected function declaration.");
+}
+
+void block(block_node *block) {
+	block->stms = malloc(AST_AMOUNT_INIT * 5 * sizeof(statement_node));
+	size_t block_ix = 0, ptr_size = AST_AMOUNT_INIT * 5;
+
+	//puts("In block...");
+	if(tokens[ix].kword == BEGIN) {
+		ix++;
+		while(tokens[ix].kword != END) {
+			/*if(ix == len - 1 || expect_symbol(DECLARE))
+				issue_error("expected end of block.");*/
+
+			if(block_ix >= ptr_size) {
+				ptr_size += REALLOC_AST;
+				block->stms = realloc(block->stms, ptr_size * sizeof(statement_node));
+			}
+			
+			statement(&block->stms[block_ix++]);
+		}
+		block->stm_num = block_ix;
+	} else issue_error("expected block opening.");
+}
+
+void statement(statement_node *stm) {
+	//puts("In statement...");
+
+	if(tokens[ix].type == IDENT) {
+		assign(&stm->asg, &stm->type);
+		return;
+	}
+	
+	switch(tokens[ix].kword) {
+	case IF:
+		if_stm(&stm->cond_stm, &stm->type);
+		break;
+	case WHILE:
+		while_stm(&stm->cond_stm, &stm->type);
+		break;
+	case PLOT:
+		plot(&stm->plot, &stm->type);
+		break;
+	case RET:
+		ret(&stm->ret, &stm->type);
+		break;
+	case BREAK:
+		break_stm(&stm->type);
+		break;
+	}
+}
+
+void if_stm(cond_node *cond, stm_type *tp) {
+	*tp = COND_STM;
+
+	//puts("In if...");
+	if(tokens[ix].kword == IF) {
+		cond->cond_type = IF_T;
+
+		ix++;
+		expr(&cond->condition);
+		//ix++;
+
+		block(&cond->scope);
+		ix++;
+	}
+}
+
+void while_stm(cond_node *cond, stm_type *tp) {
+	*tp = COND_STM;
+
+	//puts("In while...");
+	if(tokens[ix].kword == WHILE) {
+		cond->cond_type = WHILE_T;
+
+		ix++;
+		expr(&cond->condition);
+		//ix++;
+
+		block(&cond->scope);
+		ix++;
+	}
+}
+
+void break_stm(stm_type *tp) {
+	//puts("In break...");
+	if(tokens[ix].kword == BREAK) {
+		*tp = BREAK_STM;
+		ix++;
+	}
+}
+
+void plot(plot_node *pl, stm_type *tp) {
+	//puts("In plot...");
+	if(tokens[ix].kword == PLOT) {
+		*tp = PLOT_STM;
+		ix++;
+
+		expr(&pl->value1);
+
+		//ix++;
+		expr(&pl->value2);
+	}
+	return;
+}
+
+void ret(ret_node *rt, stm_type *tp) {
+	//puts("In ret...");
+	if(tokens[ix].kword == RET) {
+		*tp = RET_STM;
+
+		ix++;
+		expr(&rt->ret_val);
+	}
+
+	return;
+}
+
+void assign(assign_node *asg, stm_type *tp) {
+	//puts("In assign...");
+	if(tokens[ix].type == IDENT) {
+		asg->var_ident = tokens[ix++].ident;
+		if(tokens[ix].lop == ASG) {
+			*tp = ASSIGN_STM;
+
+			ix++;
+			expr(&asg->value);
+
+		}
+	}
+	return;
+}
+
+void invoke(expr_node *func) {
+	//puts("In invoke...");
+	func->expr_type = FUNCCALL;
+	func->resolution_type = DYNAMIC;
+
+	func->lBranch = func->rBranch = NULL;
+
+	func->func_args = malloc(AST_AMOUNT_INIT * sizeof(expr_node));
+	size_t args_ix = 0, args_sz = AST_AMOUNT_INIT;
+
+	if(tokens[ix].type == IDENT) func->var_ident = copy_string(tokens[ix].ident);
+	else issue_error("expected identifier after 'invoke'");
+	
+	ix++;
+	if(tokens[ix].aop == LPAR) {
+		ix++;
+
+		//if(expect_symbol(RPAR)) free(func->func_args);
+
+		while(tokens[ix].aop != RPAR) {
+			if(args_ix >= args_sz)
+				func->func_args = realloc(
+					func->func_args, 
+					(args_sz += REALLOC_AST) * sizeof(expr_node)
+				);
+
+			expr(&func->func_args[args_ix++]);
+		}
+		func->arg_num = args_ix;
+	} else issue_error("expected parentheses after identifier");
+}
+
+void expr(expr_node *tree) {
+	tree->expr_type = OPERATION;
+	tree->resolution_type = STATIC;
+
+	//puts("In expr...");
+	tree->lBranch = calloc(1, sizeof(expr_node));
+	tree->rBranch = calloc(1, sizeof(expr_node));
+
+	term(tree->lBranch);
+	tree->operation = ADD_OP;
+	tree->rBranch->expr_type = VALUE_T;
+	tree->rBranch->value = 0;
+
+	while(tokens[ix].lop == OR || tokens[ix].lop == AND
+	     || tokens[ix].lop == GEQ || tokens[ix].lop == LEQ
+	     || tokens[ix].lop == EQ || tokens[ix].lop == NEQ
+	     || tokens[ix].lop == LT || tokens[ix].lop == GT)
+	{
+		switch(tokens[ix].lop) {
+		case OR: tree->operation = OR_OP; break;
+		case AND: tree->operation = AND_OP; break;
+		case EQ: tree->operation = EQ_OP; break;
+		case NEQ: tree->operation = NEQ_OP; break;
+		case GEQ: tree->operation = GEQ_OP; break;
+		case LEQ: tree->operation = LEQ_OP; break;
+		case LT: tree->operation = LT_OP; break;
+		case GT: tree->operation = GT_OP; break;
+		}
+	
+		ix++;
+		expr(tree->rBranch);
+	}
+}
+
+void term(expr_node *tree) {
+	tree->expr_type = OPERATION;
+	tree->resolution_type = STATIC;
+
+	//puts("In term...");
+	tree->lBranch = calloc(1, sizeof(expr_node));
+	tree->rBranch = calloc(1, sizeof(expr_node));
+
+	factor(tree->lBranch);
+	tree->operation = ADD_OP;
+	tree->rBranch->expr_type = VALUE_T;
+	tree->rBranch->value = 0;
+
+	while(tokens[ix].aop == ADD || tokens[ix].aop == SUB) {
+		if(tokens[ix].aop == ADD) ix++;
+		term(tree->rBranch);
+	}
+}
+
+void factor(expr_node *tree) {
+	tree->expr_type = OPERATION;
+	tree->resolution_type = STATIC;
+
+	//puts("In factor");
+	tree->lBranch = calloc(1, sizeof(expr_node));
+	tree->rBranch = calloc(1, sizeof(expr_node));
+
+	negate(tree->lBranch);
+	tree->operation = MULT_OP;
+	tree->rBranch->expr_type = VALUE_T;
+	tree->rBranch->value = 1;
+
+	while(tokens[ix].aop == MULT || tokens[ix].aop == DIV) {
+		switch(tokens[ix].aop) {
+		case MULT:
+			tree->operation = MULT_OP;
+			break;
+		case DIV:
+			tree->operation = DIV_OP;
+			break;
+		}
+
+		ix++;
+		factor(tree->rBranch);
+	}
+}
+
+void negate(expr_node *tree) {
+	tree->expr_type = OPERATION;
+	tree->resolution_type = STATIC;
+	tree->operation = NEG_OP;
+
+	//puts("In negate...");
+	if(tokens[ix].aop != SUB) {
+		value(tree);
+		return;
+	} else {
+		tree->lBranch = calloc(1, sizeof(expr_node));
+
+		ix++;
+		negate(tree->lBranch);
+	}
+}
+
+void value(expr_node *tree) {
+	//puts("In value...");
+
+	//printf("Type: %d\n", tokens[ix].type);
+	tree->expr_type = VALUE_T;
+	tree->resolution_type = STATIC;
+	tree->value = 0;
+
+	if(tokens[ix].aop == LPAR) {
+		ix++;
+		expr(tree);
+		ix++;
+	} else if(tokens[ix].kword == INVOKE) {
+		ix++;
+		invoke(tree);
+		ix++;
+	} else if(tokens[ix].type == IDENT) {
+		tree->expr_type = VARIABLE_T;
+		tree->resolution_type = DYNAMIC;
+
+		tree->var_ident = copy_string(tokens[ix].ident);
+		ix++;
+	} else if(tokens[ix].type == VALUE) {
+		tree->expr_type = VALUE_T;
+		tree->value = tokens[ix].value;
+
+		ix++;
+	}
+}
+
+program_node *parse_program(TokenArray arr) {
+	ix = 0;
+	tokens = arr.ptr;
+	len = arr.len;
+
+	program_node *to_ret = malloc(sizeof(program_node));
+	to_ret->funcs = NULL;
+
+	program(to_ret);
+
+	return to_ret;
+}
+#include "../include/semantics.h"
+
+String current_scope;
+size_t stack_ptr_offset, func_arg_offset;
+
+void check_scope(map sym_table, String var_ident, int is_func) {
+	String scope = is_func ? make_string("global") : current_scope;
+	char *superscope = substring(scope.ptr, '_');
+
+	var sym = take_from_scope(sym_table, var_ident, superscope);
+	//printf("///^Comparing: %s and %s^///\n", current_scope.ptr, sym.scope);
+
+	if(!sym.scope) {
+		issue_error("Symbol '%s'(scope: %s) is not defined", 
+				var_ident.ptr, scope.ptr);
+	} else {
+		char *sscope = substring(sym.scope, '_');
+		int is_within_reach = !strcmp(superscope, sscope) && scope.len > strlen(superscope);
+
+		//printf("///^Comparing: %s and %s^///\n", current_scope.ptr, superscope);
+		if(strcmp(sym.scope, scope.ptr) != 0 && !is_within_reach)
+			issue_error("Symbol '%s' is not within current scope: %s", 
+					var_ident.ptr, scope.ptr);
+
+		free(superscope);
+		free(sscope);
+	}
+
+	if(is_func) delete_string(&scope);
+}
+
+int determine_expr(expr_node *expr) {
+	int type = STATIC;
+
+	if(!expr) return STATIC;
+
+	if(expr->resolution_type == DYNAMIC)
+		return DYNAMIC;
+
+	int lside = determine_expr(expr->lBranch),
+	    rside = determine_expr(expr->rBranch);
+
+	if(lside == DYNAMIC || rside == DYNAMIC)
+		type = DYNAMIC;
+
+	return type;
+}
+
+char *parse_expr(expr_node *expr, map *sym_table) {
+	char exprstr[100000] = {0};
+
+	if(!expr) return strdup("end");
+
+	switch(expr->expr_type) {
+	case OPERATION:
+		switch(expr->operation) {
+		case ADD_OP: sprintf(
+			exprstr, "(%s + %s)",
+			parse_expr(expr->lBranch, sym_table),
+			parse_expr(expr->rBranch, sym_table)
+		); break;
+
+		case SUB_OP: sprintf(
+			exprstr, "(%s - %s)",
+			parse_expr(expr->lBranch, sym_table),
+			parse_expr(expr->rBranch, sym_table)
+		); break;
+
+		case MULT_OP: sprintf(
+			exprstr, "(%s * %s)",
+			parse_expr(expr->lBranch, sym_table),
+			parse_expr(expr->rBranch, sym_table)
+		); break;
+
+		case DIV_OP: sprintf(
+			exprstr, "(%s / %s)",
+			parse_expr(expr->lBranch, sym_table),
+			parse_expr(expr->rBranch, sym_table)
+		); break;
+
+		case AND_OP: sprintf(
+			exprstr, "(%s && %s)",
+			parse_expr(expr->lBranch, sym_table),
+			parse_expr(expr->rBranch, sym_table)
+		); break;
+
+		case OR_OP: sprintf(
+			exprstr, "(%s || %s)",
+			parse_expr(expr->lBranch, sym_table),
+			parse_expr(expr->rBranch, sym_table)
+		); break;
+		
+		case NEG_OP: sprintf(
+			exprstr, "(NEG(%s))",
+			parse_expr(expr->lBranch, sym_table)
+		); break;
+
+
+		case EQ_OP: sprintf(
+			exprstr, "(%s == %s)",
+			parse_expr(expr->lBranch, sym_table),
+			parse_expr(expr->rBranch, sym_table)
+		); break;
+
+		case NEQ_OP: sprintf(
+			exprstr, "(%s != %s)",
+			parse_expr(expr->lBranch, sym_table),
+			parse_expr(expr->rBranch, sym_table)
+		); break;
+		
+		case GEQ_OP: sprintf(
+			exprstr, "(%s >= %s)",
+			parse_expr(expr->lBranch, sym_table),
+			parse_expr(expr->rBranch, sym_table)
+		); break;
+		
+		case LEQ_OP: sprintf(
+			exprstr, "(%s <= %s)",
+			parse_expr(expr->lBranch, sym_table),
+			parse_expr(expr->rBranch, sym_table)
+		); break;
+
+		case LT_OP: sprintf(
+			exprstr, "(%s < %s)",
+			parse_expr(expr->lBranch, sym_table),
+			parse_expr(expr->rBranch, sym_table)
+		); break;
+
+		case GT_OP: sprintf(
+			exprstr, "(%s > %s)",
+			parse_expr(expr->lBranch, sym_table),
+			parse_expr(expr->rBranch, sym_table)
+		); break;
+
+		}
+		break;
+	case VALUE_T:
+		sprintf(exprstr, "%lli", expr->value);
+		break;
+	case VARIABLE_T:
+		sprintf(exprstr, "%s", expr->var_ident.ptr);
+		check_scope(*sym_table, expr->var_ident, 0);
+
+		break;
+	case FUNCCALL:
+		sprintf(exprstr, "FUNC(%s)", expr->var_ident.ptr);
+
+		for(size_t i = 0; i < expr->arg_num; i++) {
+			int tp = determine_expr(&expr->func_args[i]);
+			expr->func_args[i].resolution_type = tp;
+
+			printf("ARG: %s\n", parse_expr(&expr->func_args[i], sym_table));
+		}
+
+		check_scope(*sym_table, expr->var_ident, 1);
+		break;
+	}
+
+	return strdup(exprstr);
+}
+
+void parse_ret(ret_node *rt, map *sym_table) {
+	char *expr = parse_expr(&rt->ret_val, sym_table);
+	int type = determine_expr(&rt->ret_val);
+
+	rt->ret_val.resolution_type = type;
+	printf("RETURN: %s\n", expr);
+
+	free(expr);
+}
+
+void parse_plot(plot_node *pt, map *sym_table) {
+	char *expr1 = parse_expr(&pt->value1, sym_table),
+	     *expr2 = parse_expr(&pt->value2, sym_table);
+
+	int type = determine_expr(&pt->value1),
+	    type2 = determine_expr(&pt->value2);
+
+	pt->value1.resolution_type = type;
+	pt->value2.resolution_type = type2;
+
+	printf("PLOT: %s -> %s\n", expr1, expr2);
+
+	free(expr1);
+	free(expr2);
+}
+
+void parse_cond(cond_node *cnd, map *sym_table) {
+	puts("TYPE: CONDITION");
+
+	char *cond = parse_expr(&cnd->condition, sym_table);
+	int type = determine_expr(&cnd->condition);
+
+	cnd->condition.resolution_type = type;
+
+	if(cnd->cond_type == WHILE_T) {
+		string_push_back(&current_scope, 'w');
+		printf("WHILE -> %s -> {\n", cond);
+	} else {
+		string_push_back(&current_scope, 'i');
+		printf("IF -> %s -> {\n", cond);
+	}
+
+	//printf("////SCOPE: %s////\n", current_scope.ptr);
+	parse_block(&cnd->scope, sym_table);
+	string_pop(&current_scope);
+
+	puts("}");
+
+	free(cond);
+}
+
+void parse_asg(assign_node *asg, map *sym_table) {
+	char *expr = parse_expr(&asg->value, sym_table);
+	int type = determine_expr(&asg->value);
+
+	asg->value.resolution_type = type;
+
+	var sym = take(*sym_table, asg->var_ident);
+	char *superscope = sym.scope ? substring(sym.scope, '_') : NULL,
+	     *sscope2 = substring(current_scope.ptr, '_');
+
+	if(!superscope || strcmp(superscope, sscope2) != 0) {
+		stack_ptr_offset += sizeof(lint);
+		var new_sym = { VARIABLE, stack_ptr_offset, strdup(current_scope.ptr), asg->var_ident };
+		
+		//printf("Var: %s -> %s\n", asg->var_ident.ptr, new_sym.scope);
+
+		insert(sym_table, new_sym);
+	}
+
+	printf("ASSIGNMENT: %s\n", type == STATIC ? "STATIC" : "DYNAMIC");
+	printf("%s = %s;\n", asg->var_ident.ptr, expr);
+
+	free(expr);
+	free(superscope);
+	free(sscope2);
+}
+
+void parse_stm(statement_node *stm, map *sym_table) {
+	puts("STATEMENT:");
+	switch(stm->type) {
+	case COND_STM:   parse_cond(&stm->cond_stm, sym_table);  break; 
+	case RET_STM:    parse_ret(&stm->ret, sym_table);        break; 
+	case ASSIGN_STM: parse_asg(&stm->asg, sym_table);        break; 
+	case PLOT_STM:   parse_plot(&stm->plot, sym_table);      break; 
+	case BREAK_STM:  puts("BREAK"); 	      		 break; 
+	}
+}
+
+void parse_block(block_node *blc, map *sym_table) {
+	for(size_t i = 0; i < blc->stm_num; i++)
+		parse_stm(&blc->stms[i], sym_table);
+}
+
+void parse_decl(assign_node *decl, map *sym_table) {
+	var new_sym = { 
+		ARGUMENT, 
+		func_arg_offset + STFRAME_OFFSET, 
+		strdup(current_scope.ptr), 
+		decl->var_ident
+	};
+
+	insert(sym_table, new_sym);
+	printf("%s, ", decl->var_ident.ptr);
+}
+
+void parse_func(function_node *func, map *sym_table) {
+	current_scope = make_string(func->ident.ptr);
+
+	symbol sym_func = take(*sym_table, func->ident), new_func;
+	if(!sym_func.scope) {
+		new_func = (var){ 
+			FUNCTION, 
+			0, 
+			"global", 
+			func->ident, 
+			malloc(func->arg_num * sizeof(size_t)),
+			func->arg_num
+		};
+
+		insert(sym_table, new_func);
+	} else issue_error("Function '%s' cannot be redefined.", func->ident.ptr);
+
+	string_push_back(&current_scope, '_');
+	func_arg_offset = stack_ptr_offset = 0;
+
+	//printf("////SCOPE: %s////\n", current_scope.ptr);
+
+	printf("FUNC - %s - (", func->ident.ptr);
+	for(size_t i = 0; i < func->arg_num; i++) {
+		parse_decl(&func->args[i], sym_table);
+		new_func.arg_offsets[i] = func_arg_offset + STFRAME_OFFSET;
+
+		func_arg_offset += sizeof(lint);
+	}
+
+	printf(") {\n");
+	parse_block(&func->scope, sym_table);
+	printf("}\n");
+	
+	func->stack_sz = stack_ptr_offset;
+	delete_string(&current_scope);
+}
+
+void parse_ast(program_node *prog, map *sym_table) {
+	puts("--PROGRAM BEGIN--");
+	for(size_t i = 0; i < prog->sz; i++)
+		parse_func(&prog->funcs[i], sym_table);
+
+	puts("--PROGRAM END--");
+
+}
+
+analysis_res perform_smc_analysis(program_node *program) {
+	map sym_table = make_map(SYMTABLE_SZ);
+
+	stack_ptr_offset = 0;
+	parse_ast(program, &sym_table); 
+
+	return (analysis_res){ sym_table, stack_ptr_offset };
+}
+
+/*int main(int argc, char **argv) {
+	FILE *src = fopen(argv[1], "r");
+
+	TokenArray tkns = lex(src);
+	program_node *prg = parse_program(tkns);
+
+	map sym_table = perform_smc_analysis(prg);
+	for(size_t i = 0; i < SYMTABLE_SZ; i++) {
+		if(sym_table.ptr[i]->node.scope)
+		for(list *j = sym_table.ptr[i]; j; j = j->next) {
+			printf("Type: %s\nScope: %s\nOffset: %zu\nIdentifier: %s\n\n",
+					j->node.symbol_type == VARIABLE ? "variable" : "function",
+					j->node.scope, j->node.num, j->node.ident.ptr
+			      );
+		}
+	}
+
+	fclose(src);
+	return 0;
+}*/
+
+#include <stdlib.h>
+
+#include "../include/my_string.h"
+
+String make_string(const char *ptr) {
+	size_t len = strlen(ptr);
+
+	char *init_mem = calloc(len + 1, sizeof(char));
+	memcpy(init_mem, ptr, len + 1);
+
+	String to_ret = {
+		init_mem,
+		len,
+		len
+	};
+
+	return to_ret;
+}
+
+String make_string_char(char ch) {
+	char *init_mem = calloc(DEFAULT_SZ, sizeof(char));
+	init_mem[0] = ch;
+
+	String to_ret = {
+		init_mem,
+		1,
+		DEFAULT_SZ
+	};
+
+	return to_ret;
+}
+
+String copy_string(String to_copy) {
+	String new_string = {
+		strdup(to_copy.ptr),
+		to_copy.len,
+		to_copy.max_size
+	};
+
+	return new_string;
+}
+
+StringVector make_vector(size_t reserved_size) {
+	StringVector to_ret = {
+		calloc(reserved_size, sizeof(String)),
+		reserved_size, 0
+	};
+	
+	return to_ret;
+}
+
+String pop(StringVector *vec) {
+	if(vec->ix <= 0) return INVALID_STRING;
+	return vec->ptr[--vec->ix];
+}
+
+int is_alpha(String to_check) {
+	for(int i = 0; i < to_check.len; i++)
+		if(!IS_ALPHA(to_check.ptr[i]))
+			return 0;
+
+	return 1;
+}
+
+string_type string_dettype(String to_check) {
+	int alp = 0, num = 0, ansi = 0;
+	for(int i = 0; i < to_check.len; i++) {
+		if(IS_ALPHA(to_check.ptr[i]))
+			alp++;
+		else if(IS_NUM(to_check.ptr[i]))
+			num++;
+		else ansi++;
+	}
+
+	if(ansi) return SPECIAL_ANSI;
+
+	if(alp && !num) return ALPHA;
+	else if(!alp && num) return NUM;
+	
+	return ALPHANUM;
+}
+
+int is_empty(String to_check) {
+	return to_check.len == 0;
+}
+
+void push_back(StringVector *vec, String to_push) {
+	if(vec->ix >= vec->size) {
+		vec->ptr = realloc(vec->ptr, (vec->size + REALLOC_INTERVAL) * sizeof(String));
+		vec->size += REALLOC_INTERVAL;
+	}
+	
+	vec->ptr[vec->ix++] = copy_string(to_push);
+}
+
+void delete_string(String *str) {
+	free(str->ptr);
+
+	str->ptr = NULL;
+	str->len = 0;
+
+	return;
+}
+
+void delete_vector(StringVector *to_delete) {
+	for(size_t i = 0; i < to_delete->ix; i++)
+		delete_string(&to_delete->ptr[i]);
+
+	free(to_delete->ptr);
+
+	to_delete->ptr = NULL;
+	to_delete->size = to_delete->ix = 0;
+}
+
+void string_push_back(String *str, char to_push) {
+	if(str->len >= str->max_size) {
+		str->ptr = realloc(str->ptr, str->max_size + REALLOC_INTERVAL + 1);
+		str->max_size += REALLOC_INTERVAL;
+	}
+
+	str->ptr[str->len++] = to_push;
+	str->ptr[str->len] = '\0';
+}
+
+char string_pop(String* str) {
+	char popped_char = str->ptr[--str->len];
+	str->ptr[str->len] = '\0';
+
+	return popped_char;
+}
+
+char *substring(char *str, char ch) {
+	char substr[DEFAULT_SZ] = {0};
+	int ix = 0;
+
+	while(*str) {
+		substr[ix++] = *str;
+		if(*str++ == ch) break;
+	}
+
+	return strdup(substr);
+}
+

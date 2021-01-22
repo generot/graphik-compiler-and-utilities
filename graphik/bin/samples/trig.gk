@@ -1,0 +1,16 @@
+declare main(none) begin
+	cnt = 0
+	a = 3
+
+	while cnt < 100 begin
+		thing = 0
+		while thing < cnt begin
+			plot thing cnt
+			thing = thing + 1
+		end
+		
+		cnt = cnt + 1
+	end
+
+	ret 0 
+end

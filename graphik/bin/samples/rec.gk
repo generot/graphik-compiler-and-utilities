@@ -1,0 +1,18 @@
+declare func(a) begin
+	if a == 0 begin
+		ret 1
+	end
+	
+	k = invoke func(a - 1)
+
+	ret a * k
+end
+
+declare main(none) begin
+	a = 6
+	b = invoke func(a)
+
+	plot a b
+
+	ret 0
+end

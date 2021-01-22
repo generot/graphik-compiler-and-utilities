@@ -1,0 +1,75 @@
+Graphik Programming Language
+-------------------------------
+|	 AST structure	      |
+|-----------------------------|
+|By: Martin Nakov	      |
+|Date: 26.11.2020	      |
+-------------------------------
+
+//The structure is a little outdated as of 27.12.2020
+//An update is to be made soon enough.
+
+#Guide:
+	- "..." -> May be more than one.
+	- "|" -> May be one thing or another.
+	- If a node member is used in more than one node,
+	its type would not be specified again in its second
+	occurance.
+
+Program:
+	Function ...	<- "Struct"	
+
+Function:
+	Ident = "String"
+	Args = "none" | ...
+	Block = "Struct"
+
+Block:
+	Statement ... 	<- "Struct"
+
+Statement:
+	If statement = "Struct"
+	While loop = "Struct"
+	Variable definition = "Struct"
+	Assignment = "Struct"
+
+If statement:
+	Expression(codition) = "Struct"
+	Block
+
+While loop:
+	Expression(codition)
+	Block
+
+Variable definition:
+	Ident
+	Expression
+
+Assignment:
+	Offset = "Uint"
+	Expression
+
+Expression:
+	Value1 = "Int", Value2 = "Int"
+	Offset1, Offset2
+	Operation = "Struct"
+	Left side = "Expression"
+	Right side = "Expression"
+
+Operation:
+	Arithmetic
+	Logical
+
+Arithmetic:
+	Addition
+	Subtraction
+	Multiplication
+	Division
+
+Logical:
+	And
+	Or
+	Greater than(or equal to)
+	Less than(or equal to)
+	Equal
+	

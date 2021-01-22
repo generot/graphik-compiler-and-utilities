@@ -1,0 +1,16 @@
+declare main(none) begin
+	cnt1 = 0
+	limit = 40
+
+	while cnt1 < limit begin
+		cnt2 = 0
+		while cnt2 < limit begin
+			plot cnt2 cnt1
+			cnt2 = cnt2 + 1
+		end
+
+		cnt1 = cnt1 + 1
+	end
+
+	ret 0
+end

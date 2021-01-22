@@ -1,0 +1,27 @@
+declare fib(n) begin
+	if n == 0 begin
+		ret 0
+	end
+
+	if n == 1 begin
+		ret 1
+	end
+
+	lbr = invoke fib(n - 1)
+	rbr = invoke fib(n - 2)
+
+	ret lbr + rbr
+end
+
+declare main(none) begin
+	cnt = 0
+
+	while cnt < 20 begin
+		f = invoke fib(cnt)
+		plot cnt f
+
+		cnt = cnt + 1
+	end
+
+	ret 0
+end

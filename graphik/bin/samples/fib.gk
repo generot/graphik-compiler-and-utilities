@@ -1,0 +1,15 @@
+declare main(none) begin
+	a = 0
+	b = 1
+
+	cnt = 0
+	while cnt < 20 begin
+		plot a b
+		a = a + b
+		b = a - b
+
+		cnt = cnt + 1
+	end
+
+	ret 0
+end
