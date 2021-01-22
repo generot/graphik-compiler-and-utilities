@@ -63,11 +63,10 @@ For the option `Enter an expression`, you enter a mathematical expression(which 
 Example:<br>
 ```
 3 + 4 * (10 / 5 + 12 * 3) ^ 2
-```
-<br>
-```
+-----------------------------
 x - (x / 10) ^ 3 / 6 + (x / 10) ^ 5 / 120
 ```
+
 <br>
 We are dividing the parameter by a certain value, to zoom in on the graphical representation of the respective function(otherwise it's quite zoomed out).<br>
 
