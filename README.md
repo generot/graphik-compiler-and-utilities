@@ -57,3 +57,26 @@ declare main(none) begin
 end
 ```
 <br>
+
+Using the calculator is a very simple process, therefore I won't go in too much depth here(simply because there isn't such).<br>
+For the option `Enter an expression`, you enter a mathematical expression(which may or may not include parameters).<br>
+Example:<br>
+```
+3 + 4 * (10 / 5 + 12 * 3) ^ 2
+```
+<br>
+```
+x - (x / 10) ^ 3 / 6 + (x / 10) ^ 5 / 120
+```
+<br>
+We are dividing the parameter by a certain value, to zoom in on the graphical representation of the respective function(otherwise it's quite zoomed out).<br>
+
+The other two options expect a directory to be entered. If an invalid directory is entered, an error message box will pop up.<br>
+To go back to the main menu, simply press the `Escape` key.<br>
+
+The `Load Graphik output` command expects the directory of a text file, containing coordinates, to be plotted on the Cartesian plain.<br>
+The coordinates should be positioned in exactly the same manner as Graphik output. Graphik is intended to be used here, although you may freely use other programming languages to achieve the same results.<br>
+
+The `Load expression file` command expects a text file, containing mathematical expressions on each line, to be plotted on the same plain.<br>
+Check the `expr.txt` file in the `samples` folder for reference.
+
