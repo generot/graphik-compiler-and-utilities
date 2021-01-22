@@ -17,7 +17,7 @@ declare main(none) begin
 		alpha = alpha - 1
 	end
 
-	if alpha == 0 || beta > 34 && alpha != 10 begin
+	if (alpha == 0) || (beta > 34) && (alpha != 10) begin
 		someRes = invoke sum(alpha beta)
 	end
 
