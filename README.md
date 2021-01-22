@@ -24,7 +24,7 @@ There must be atleast 32 bytes of shadow space for function calls(not quoted).
 ```
 <br>
 
-A thorough documentary of the Graphik programming language will be coming soon, but as of now, you may use the documents I have provided in the `docs` folder in the `graphik` directory as a reference.<br>
+A thorough documentary of the Graphik programming language has been made and exists within this repository(`GraphikDocumentation.pdf`). You may use the documents I have provided in the `docs` folder in the `graphik` directory as a reference as well.<br>
 
 Example program(using recursion):<br>
 ```
@@ -77,5 +77,4 @@ The `Load Graphik output` command expects the directory of a text file, containi
 The coordinates should be positioned in exactly the same manner as Graphik output. Graphik is intended to be used here, although you may freely use other programming languages to achieve the same results.<br>
 
 The `Load expression file` command expects a text file, containing mathematical expressions on each line, to be plotted on the same plain.<br>
-Check the `expr.txt` file in the `samples` folder for reference.
-
+Check the `expr.txt` file in the `samples` folder for reference.<br>
