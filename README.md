@@ -7,7 +7,7 @@ The GLC compiler has been built entirely from scratch, using only the C programm
 <p>
 -Lexical analysis<br>
 -Grammatical analysis(Parsing)<br>
--Semantic analysis
+-Semantic analysis<br>
 -Assembly generation
 </p>
 
