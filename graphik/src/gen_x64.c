@@ -1,10 +1,10 @@
 #include "../include/gen_x64.h"
 
 String curr_scope;
-bool rax, rcx, rdx;
+bool rax, rcx, rdx, rbx;
 
 int if_stack[20000], while_stack[20000];
-size_t if_ptr, wh_ptr, stack_size;
+size_t if_ptr, wh_ptr, stack_size, break_symb;
 
 char *logops[] = {
 	"setl", "setg", 
@@ -190,19 +190,21 @@ void trsl_dynamic_expr(FILE *out, expr_node *tree, map sym_table) {
 			if(rbr) trsl_dynamic_expr(out, tree->lBranch, sym_table);
 			else trsl_dynamic_expr(out, tree->rBranch, sym_table);
 
-			if((!lbr || !rbr) && !rdx) {
-				emit(out, "mov rdx, rax");
+			if(!lbr && !rbr && !rbx) {
+				emit(out, "mov rbx, rax");
 
-				rdx = true;
+				rbx = true;
 				rax = rcx = false;
 			}
 
 			if(rbr) trsl_dynamic_expr(out, tree->rBranch, sym_table);
 			else trsl_dynamic_expr(out, tree->lBranch, sym_table);
 
-			if(rdx && (!lbr || !rbr)) {
-				emit(out, "idiv rdx");
-				rdx = false;
+			emit(out, "cqo");
+
+			if(rbx && !lbr && !rbr) {
+				emit(out, "idiv rbx");
+				rbx = false;
 			} else {
 				emit(out, "idiv rcx");
 				rcx = false;
@@ -423,6 +425,7 @@ void trsl_cond(FILE *out, cond_node *cnd, map sym_table) {
 	case WHILE_T:
 		emit(out, "wl%d:", occs_w);
 
+		break_symb = occs_w;
 		push_stack(occs_w, true);
 		occs_w++;
 
@@ -466,7 +469,7 @@ void trsl_cond(FILE *out, cond_node *cnd, map sym_table) {
 }
 
 void trsl_break(FILE *out) {
-	emit(out, "jmp lw%d", while_stack[wh_ptr - 1]);
+	emit(out, "jmp lw%zu", break_symb);
 }
 
 void trsl_statement(FILE *out, statement_node *stm, map sym_table) {
@@ -516,8 +519,8 @@ void generate_asm(FILE *out, program_node *ast, analysis_res res) {
 
 	fputc('\n', out);
 
-	stack_size = if_ptr = wh_ptr = 0;
-	rax = rcx = rdx = false;
+	stack_size = if_ptr = wh_ptr = break_symb = 0;
+	rax = rbx = rcx = rdx = false;
 
 	STARTUP_PROC;
 	trsl_program(out, ast, res.sym_table);

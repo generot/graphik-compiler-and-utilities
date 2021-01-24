@@ -1,0 +1,48 @@
+declare main(none) begin
+	calcDm = 600
+	scale = 10
+
+	sx = calcDm / 2
+	sy = sx
+
+	cy = -sy
+
+	while cy < sy begin
+		cx = -sx
+		while cx < sx begin
+			px = cx
+			py = cy
+
+			constPx = px
+			constPy = py
+
+			iter = 0
+
+			while iter < 10 begin
+				newX = px * px - py * py
+				newY = 2 * px * py
+
+				px = newX + constPx
+				py = newY + constPy
+
+				res = px * px + py * py
+
+				if res > 4 begin
+					break
+				end
+
+				iter = iter + 1
+			end
+	
+			if iter >= 7 begin
+				plot cx cy
+			end
+			
+			cx = cx + 1
+		end
+
+		cy = cy + 1
+	end
+	
+	ret 0
+end

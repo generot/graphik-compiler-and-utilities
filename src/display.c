@@ -21,6 +21,34 @@ void clear_screen(HDC dc, int w, int h, COLORREF color) {
     DeleteObject(br);
 }
 
+COORD parse_line(char *ln) {
+    int seen_space = 0, seen_minus = 0;
+    int crd1 = 0, crd2 = 0;
+
+    while(*ln) {
+        if(*ln == ' ') {
+            seen_space = 1;
+            if(seen_minus) {
+                crd1 *= -1;
+                seen_minus = 0;
+            }
+        }
+
+        if(*ln == '-') seen_minus = 1;
+
+        if(IS_NUM(*ln)) {
+            if(!seen_space) crd1 = crd1 * 10 + (*ln) - '0';
+            else crd2 = crd2 * 10 + (*ln) - '0';
+        }
+
+        ln++;
+    }
+
+    if(seen_minus) crd2 *= -1;
+
+    return (COORD){crd1, crd2};
+}
+
 void plot_file(HDC dc, char *filebuff) {
     clear_screen(dc, WIDTH, HEIGHT, COL_BLACK);
     draw_grid(dc, WIDTH, HEIGHT);
@@ -28,23 +56,10 @@ void plot_file(HDC dc, char *filebuff) {
     char *line = strtok(filebuff, "\n");
 
     while(line) {
-        int seen_space = 0, crd1 = 0, crd2 = 0;
+        COORD crds = parse_line(line);
+        printf("%d %d\n", crds.X, crds.Y);
 
-        while(*line) {
-            if(*line == ' ')
-                seen_space = 1;
-
-            if(IS_NUM(*line)) {
-                if(!seen_space)
-                    crd1 = crd1 * 10 + (*line) - '0';
-                else
-                   crd2 = crd2 * 10 + (*line) - '0';
-            }
-
-            line++;
-        }
-
-        SetPixel(dc, crd1 + WIDTH / 2, -crd2 + HEIGHT / 2, COL_PLOT);
+        SetPixel(dc, crds.X + WIDTH / 2, -crds.Y + HEIGHT / 2, COL_PLOT);
         line = strtok(NULL, "\n");
     }
 }
