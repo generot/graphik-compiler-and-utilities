@@ -34,7 +34,7 @@ declare main(none) begin
 				iter = iter + 1
 			end
 	
-			if iter >= 7 begin
+			if iter >= 10 begin
 				plot cx cy
 			end
 			
