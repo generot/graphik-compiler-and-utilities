@@ -174,7 +174,7 @@ void trsl_dynamic_expr(FILE *out, expr_node *tree, map sym_table) {
 			if(lbr) trsl_dynamic_expr(out, tree->lBranch, sym_table);
 			else trsl_dynamic_expr(out, tree->rBranch, sym_table);
 
-			if(rdx && !lbr && !rbr) {
+			if(rdx && !rcx && !lbr && !rbr) {
 				emit(out, "imul rdx");
 				rdx = false;
 			} else {
@@ -202,7 +202,7 @@ void trsl_dynamic_expr(FILE *out, expr_node *tree, map sym_table) {
 
 			emit(out, "cqo");
 
-			if(rbx && !lbr && !rbr) {
+			if(rbx && !rcx && !lbr && !rbr) {
 				emit(out, "idiv rbx");
 				rbx = false;
 			} else {
